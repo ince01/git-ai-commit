@@ -1,74 +1,32 @@
 use clap::Parser;
-use git2::Repository;
-use reqwest::blocking::Client;
-use serde_json::json;
+mod ai_prompt;
+mod gemini_api;
+mod git_utils;
 
-fn is_first_commit(repo: &Repository) -> bool {
-    repo.head().is_err() // If HEAD doesn't exist, it's the first commit
-}
-
-fn get_git_diff() -> String {
-    let repo = Repository::open(".").expect("Failed to open repository");
-
-    if is_first_commit(&repo) {
-        return "This is the first commit. Generate an initial commit message.".to_string();
-    }
-
-    let head = repo.head().expect("Failed to get HEAD");
-    let tree = head.peel_to_tree().expect("Failed to get tree");
-    let diff = repo
-        .diff_tree_to_workdir(Some(&tree), None)
-        .expect("Failed to get diff");
-
-    let mut diff_text = String::new();
-    diff.print(git2::DiffFormat::Patch, |_, _, line| {
-        diff_text.push_str(std::str::from_utf8(line.content()).unwrap());
-        true
-    })
-    .unwrap();
-
-    diff_text
-}
-
-fn generate_commit_message(diff: &str) -> String {
-    let api_key = "your_openai_api_key";
-    let client = Client::new();
-    let response = client.post("https://api.openai.com/v1/chat/completions")
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&json!({
-            "model": "gpt-4",
-            "messages": [
-                {"role": "system", "content": "You are a helpful assistant that writes concise, meaningful Git commit messages."},
-                {"role": "user", "content": format!("Analyze the following Git diff and suggest a commit message:\n\n{}", diff)}
-            ]
-        }))
-        .send()
-        .expect("Failed to call OpenAI API");
-
-    let json_response: serde_json::Value = response.json().expect("Failed to parse response");
-    json_response["choices"][0]["message"]["content"]
-        .as_str()
-        .unwrap_or("Generated commit message failed")
-        .to_string()
-}
-
-#[derive(Parser)]
+#[derive(Parser, Debug)]
+#[command(author, version, about = "Generate emoji-rich Git commit messages with Gemini AI", long_about = None)]
 struct Args {
+    /// Enable debug output
     #[arg(short, long)]
-    commit: bool,
+    debug: bool,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
-    let diff = get_git_diff();
-    let commit_message = generate_commit_message(&diff);
+    let git_diff_result = git_utils::get_git_diff().await; // Await the future
 
-    println!("Suggested commit message:\n{}", commit_message);
+    let git_diff = match git_diff_result {
+        Ok(diff) => diff,
+        Err(e) => {
+            eprintln!("🚨 Error getting git diff: {}", e);
+            return;
+        }
+    };
 
-    if args.commit {
-        std::process::Command::new("git")
-            .args(["commit", "-m", &commit_message])
-            .status()
-            .expect("Failed to execute Git commit");
+    match gemini_api::generate_commit_message_with_gemini(&git_diff, args.debug).await {
+        // Pass a reference to the result
+        Ok(msg) => println!("💡 Suggested Commit: {}", msg),
+        Err(e) => eprintln!("🚨 Error: {}", e),
     }
 }
