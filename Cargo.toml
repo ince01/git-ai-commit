@@ -2,6 +2,12 @@
 name = "git-ai-commit"
 version = "0.1.0"
 edition = "2024"
+authors = ["ince01 <alt.f4.to@gmail.com>"]
+description = "🤖 Smarter commits, crafted by AI & powered by Rust’s speed 🦀💡"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ince01/git-ai-commit"
+homepage = "https://github.com/ince01/git-ai-commit"
+readme = "README.md"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
