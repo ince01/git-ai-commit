@@ -1,6 +1,6 @@
 [package]
 name = "git-ai-commit"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["ince01 <alt.f4.to@gmail.com>"]
 description = "🤖 Smarter commits, crafted by AI & powered by Rust’s speed 🦀💡"
