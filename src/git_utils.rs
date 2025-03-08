@@ -1,7 +1,7 @@
-use git2::{Error, Repository};
+use git2::{Error, Repository, Signature};
 use tokio::task;
 
-pub fn is_first_commit(repo: &Repository) -> bool {
+fn is_first_commit(repo: &Repository) -> bool {
     repo.head().is_err() // If HEAD doesn't exist, it's the first commit
 }
 
@@ -32,4 +32,56 @@ pub async fn get_git_diff() -> Result<String, Error> {
     })
     .await
     .expect("Task panicked")
+}
+
+pub async fn commit_staged_files(message: String) -> Result<(), Error> {
+    // Run the Git operations in a blocking task
+    task::spawn_blocking(move || {
+        // Open the repository
+        let repo = Repository::open(".")?;
+
+        // Get the index (staging area)
+        let mut index = repo.index()?;
+
+        // Create a tree from the index
+        let tree_oid = index.write_tree()?;
+        let tree = repo.find_tree(tree_oid)?;
+
+        // Get the current HEAD reference
+        let head = repo.head().ok(); // HEAD might not exist in a new repo
+        let parent_commit = head.and_then(|h| h.peel_to_commit().ok());
+
+        // Get user name and email from git config
+        let config = repo.config()?;
+        let name = config
+            .get_string("user.name")
+            .unwrap_or_else(|_| "Unknown".to_string());
+        let email = config
+            .get_string("user.email")
+            .unwrap_or_else(|_| "unknown@example.com".to_string());
+
+        // Create a signature (author and committer)
+        let sig = Signature::now(&name, &email)?;
+
+        // Create the commit
+        repo.commit(
+            Some("HEAD"), // Update HEAD to point to the new commit
+            &sig,         // Author
+            &sig,         // Committer
+            &message,     // Commit message
+            &tree,        // Tree
+            parent_commit
+                .as_ref()
+                .map(|c| vec![c])
+                .unwrap_or_else(Vec::new)
+                .as_slice(),
+        )?;
+
+        println!("👨🏽‍💻 Committed successfully: {}", message);
+        Ok::<(), Error>(())
+    })
+    .await
+    .map_err(|e| Error::from_str(&e.to_string()))??;
+
+    Ok(())
 }
