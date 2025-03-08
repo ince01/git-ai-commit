@@ -1,13 +1,19 @@
 use git2::{Error, Repository, Signature};
+use std::env;
 use tokio::task;
 
 fn is_first_commit(repo: &Repository) -> bool {
     repo.head().is_err() // If HEAD doesn't exist, it's the first commit
 }
 
+fn get_git_repo() -> Result<Repository, Error> {
+    let repo_path = env::current_dir().map_err(|e| Error::from_str(&e.to_string()))?;
+    Repository::discover(&repo_path)
+}
+
 pub async fn get_git_diff() -> Result<String, Error> {
     task::spawn_blocking(move || {
-        let repo = Repository::open(".").expect("Failed to open repository");
+        let repo = get_git_repo()?;
 
         if is_first_commit(&repo) {
             return Ok("🌱 Initial commit to kickstart the project 🚀".to_string());
@@ -38,7 +44,7 @@ pub async fn commit_staged_files(message: String) -> Result<(), Error> {
     // Run the Git operations in a blocking task
     task::spawn_blocking(move || {
         // Open the repository
-        let repo = Repository::open(".")?;
+        let repo = get_git_repo()?;
 
         // Get the index (staging area)
         let mut index = repo.index()?;
