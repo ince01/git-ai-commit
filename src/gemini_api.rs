@@ -13,7 +13,7 @@ pub async fn generate_commit_message_with_gemini(
     )?;
 
     let api_url =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     let prompt = get_ai_commit_message_prompt(diff);
 
